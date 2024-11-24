@@ -17,27 +17,31 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Pygame RPG")
 
 # Load assets
-map_image = pygame.image.load("assets/map.png")
-main_character_image = pygame.image.load("assets/char.png")
+map_image = pygame.image.load("map.png")
+main_character_image = pygame.image.load("main_character.png")
 main_character_image = pygame.transform.scale(main_character_image, (50, 50))  # Resize if needed
 
 # Character class
 class NPC:
-    def __init__(self, x, y, image_path, dialog):
+    def __init__(self, x, y, image_path, dialog, responses):
         self.image = pygame.image.load(image_path)
         self.image = pygame.transform.scale(self.image, (50, 50))  # Resize NPC
         self.rect = self.image.get_rect(topleft=(x, y))
         self.dialog = dialog
+        self.responses = responses  # A list of responses for the player
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
 
     def interact(self):
-        # Display the dialog
-        return self.dialog
+        return self.dialog, self.responses
 
 # Create an NPC
-npc = NPC(400, 300, "assets/npc.png", "Hello, adventurer! Welcome to the world of Pygame.")
+npc = NPC(400, 300, "npc.png", "Hello, adventurer! What brings you here?", [
+    "1. I'm here to explore.",
+    "2. I'm looking for treasure.",
+    "3. Just passing by."
+])
 
 # Main character setup
 main_character = main_character_image
@@ -45,19 +49,29 @@ main_character_rect = main_character.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_
 character_speed = 5
 
 # Dialog system
-def display_dialog(surface, text):
+def display_dialog(surface, text, options):
     font = pygame.font.Font(None, 36)
-    dialog_box = pygame.Rect(50, SCREEN_HEIGHT - 100, SCREEN_WIDTH - 100, 50)
+    dialog_box = pygame.Rect(50, SCREEN_HEIGHT - 150, SCREEN_WIDTH - 100, 100)
     pygame.draw.rect(surface, WHITE, dialog_box)
     pygame.draw.rect(surface, BLACK, dialog_box, 2)
+
+    # Render main dialog text
     text_surface = font.render(text, True, BLACK)
     surface.blit(text_surface, (dialog_box.x + 10, dialog_box.y + 10))
+
+    # Render response options
+    for i, option in enumerate(options):
+        option_surface = font.render(option, True, BLACK)
+        surface.blit(option_surface, (dialog_box.x + 10, dialog_box.y + 50 + i * 30))
 
 # Game loop
 clock = pygame.time.Clock()
 running = True
 show_dialog = False
 dialog_text = ""
+dialog_options = []
+player_response = ""
+response_action = None
 
 while running:
     screen.fill(WHITE)
@@ -67,9 +81,24 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and show_dialog:
-            # Close dialog on space press
-            show_dialog = False
+        elif event.type == pygame.KEYDOWN:
+            if show_dialog:
+                # Handle dialog options
+                if event.key == pygame.K_1 and len(dialog_options) > 0:
+                    player_response = dialog_options[0]
+                    response_action = "exploring"  # Trigger some action based on the choice
+                    show_dialog = False  # Close dialog after response
+                elif event.key == pygame.K_2 and len(dialog_options) > 1:
+                    player_response = dialog_options[1]
+                    response_action = "treasure hunting"
+                    show_dialog = False
+                elif event.key == pygame.K_3 and len(dialog_options) > 2:
+                    player_response = dialog_options[2]
+                    response_action = "just passing"
+                    show_dialog = False
+            elif event.key == pygame.K_SPACE and not show_dialog:
+                # Close player response display
+                player_response = ""
 
     # Movement
     keys = pygame.key.get_pressed()
@@ -83,16 +112,24 @@ while running:
         main_character_rect.x += character_speed
 
     # Interaction detection
-    if main_character_rect.colliderect(npc.rect):
+    if main_character_rect.colliderect(npc.rect) and not show_dialog:
         show_dialog = True
-        dialog_text = npc.interact()
+        dialog_text, dialog_options = npc.interact()
 
     # Draw everything
     screen.blit(main_character, main_character_rect)
     npc.draw(screen)
 
     if show_dialog:
-        display_dialog(screen, dialog_text)
+        display_dialog(screen, dialog_text, dialog_options)
+    elif player_response:
+        # Display the player's chosen response and trigger an action
+        font = pygame.font.Font(None, 36)
+        response_box = pygame.Rect(50, SCREEN_HEIGHT - 100, SCREEN_WIDTH - 100, 50)
+        pygame.draw.rect(screen, WHITE, response_box)
+        pygame.draw.rect(screen, BLACK, response_box, 2)
+        response_surface = font.render(f"You chose: {player_response} ({response_action})", True, BLACK)
+        screen.blit(response_surface, (response_box.x + 10, response_box.y + 10))
 
     pygame.display.flip()
     clock.tick(60)
